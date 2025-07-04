@@ -1,6 +1,7 @@
 
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram import Update
+from news_fetcher import init_db, news
 
 with open('TOKEN.txt') as file:
     token = file.read().strip()
@@ -20,10 +21,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/news - Get your news feed"
     )
 
-async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("No news for now.")
-
 def main():
+    init_db()
     app = ApplicationBuilder().token(token).build()
 
     app.add_handler(CommandHandler('start', start))
