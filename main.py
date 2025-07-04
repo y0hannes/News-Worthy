@@ -2,8 +2,11 @@
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram import Update
 
-with open('token.txt') as file:
+with open('TOKEN.txt') as file:
     token = file.read().strip()
+    
+with open('API_KEY.txt') as file:
+    api_key = file.read().strip()
 
 # commands
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,7 +22,6 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("No news for now.")
-
 
 def main():
     app = ApplicationBuilder().token(token).build()
