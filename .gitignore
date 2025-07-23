@@ -1,3 +1,4 @@
-*.txt
+.env
 __pycache__
 *.db
+*.txt
