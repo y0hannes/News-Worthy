@@ -1,10 +1,11 @@
 import os
-import requests
-import sqlite3
+import aiohttp
+import aiosqlite
 import logging
 from enum import Enum
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from telegram.ext import Application 
 
 # setup logging
 logging.basicConfig(
@@ -27,10 +28,9 @@ class NewsTopics(Enum):
 
 CACHE_DURATION = timedelta(hours=1)
 
-def init_db():
-    with sqlite3.connect("news.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
+async def init_db(application: Application):
+    async with aiosqlite.connect("news.db") as conn:
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS news (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
@@ -41,7 +41,8 @@ def init_db():
                 fetched_at TEXT NOT NULL
             )
         ''')
-        conn.commit()
+        await conn.commit()
+
 
 NEWS_API_TOKEN = os.getenv('NEWS_API_TOKEN')
 
@@ -50,7 +51,7 @@ if not NEWS_API_TOKEN:
 
 ENDPOINT = 'https://gnews.io/api/v4/search'
 
-def fetch_and_store_news(topic: NewsTopics, max_articles=10):
+async def fetch_and_store_news(topic: NewsTopics, max_articles=10):
     params = {
         'q': topic.value,
         'lang': 'en',
@@ -58,20 +59,21 @@ def fetch_and_store_news(topic: NewsTopics, max_articles=10):
         'token': NEWS_API_TOKEN
     }
     try:
-        res = requests.get(ENDPOINT, params=params)
-        res.raise_for_status() 
-    except requests.exceptions.RequestException as e:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(ENDPOINT, params=params) as res:
+                res.raise_for_status()
+                data = await res.json()
+    except aiohttp.ClientError as e:
         LOGGER.error(f"Error fetching news for topic '{topic.value}': {e}")
         return []
 
-    articles = res.json().get('articles', [])
+    articles = data.get('articles', [])
     if not articles:
         LOGGER.info(f"No articles found for topic '{topic.value}'.")
         return []
 
     headlines_to_return = []
-    with sqlite3.connect("news.db") as conn:
-        cursor = conn.cursor()
+    async with aiosqlite.connect("news.db") as conn:
         fetched_at = datetime.now().isoformat()
 
         for article in articles:
@@ -80,29 +82,30 @@ def fetch_and_store_news(topic: NewsTopics, max_articles=10):
             published_at = article.get('publishedAt')
             content = article.get('content')
 
-            cursor.execute('''
+            await conn.execute('''
                 INSERT INTO news (title, content, url, published_at, topic, fetched_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (title, content, url, published_at, topic.value, fetched_at))
             
             headlines_to_return.append(f"• {title}\n{url}")
+        await conn.commit()
 
     LOGGER.info(f"Successfully fetched and stored {len(articles)} articles for topic '{topic.value}'.")
     return headlines_to_return
 
-def get_cached_news(topic: NewsTopics, limit=5):
-    with sqlite3.connect("news.db") as conn:
-        cursor = conn.cursor()
+async def get_cached_news(topic: NewsTopics, limit=5):
+    async with aiosqlite.connect("news.db") as conn:
+        cursor = await conn.cursor()
         
         cutoff_time = datetime.now() - CACHE_DURATION
         # cursor.execute("DELETE FROM news WHERE fetched_at < ?", (cutoff_time.isoformat(),))
         
-        cursor.execute('''
+        await cursor.execute('''
             SELECT title, url FROM news
             WHERE topic =? 
             ORDER BY published_at DESC
             LIMIT ?
         ''', (topic.value, limit))
-        results = cursor.fetchall()
+        results = await cursor.fetchall()
 
     return [f"• {title}\n{url}" for title, url in results]

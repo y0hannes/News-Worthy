@@ -1,3 +1,4 @@
+import asyncio
 import os
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram import Update
@@ -34,11 +35,11 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Invalid topic. Please use one of: {', '.join([t.name for t in NewsTopics])}")
         return
 
-    headlines = get_cached_news(topic)
+    headlines = await get_cached_news(topic)
     
     if not headlines:
         await update.message.reply_text(f"No cached news for '{topic.value}'. Fetching fresh articles now...")
-        headlines = fetch_and_store_news(topic)
+        headlines = await fetch_and_store_news(topic)
 
     if not headlines:
         await update.message.reply_text(f"Sorry, couldn't fetch any news for '{topic.value}' at the moment.")
@@ -46,8 +47,7 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("\n\n".join(headlines))
 
 def main():
-    init_db()
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(init_db).build()
 
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler('help', help))
