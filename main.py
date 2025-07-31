@@ -1,7 +1,7 @@
 import asyncio
 import os
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from news_fetcher import init_db, fetch_and_store_news, get_cached_news, NewsTopics
 from dotenv import load_dotenv
 
@@ -28,23 +28,33 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton(topic.name, callback_data=topic.value)] for topic in NewsTopics
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text('Please choose a topic:', reply_markup=reply_markup)
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    topic_value = query.data
     try:
-        topic_str = ' '.join(context.args).upper() if context.args else 'GENERAL'
-        topic = NewsTopics[topic_str]
-    except (KeyError, AttributeError):
-        await update.message.reply_text(f"Invalid topic. Please use one of: {', '.join([t.name for t in NewsTopics])}")
+        topic = NewsTopics(topic_value)
+    except ValueError:
+        await query.edit_message_text(text=f"Invalid topic selected.")
         return
 
     headlines = await get_cached_news(topic)
     
     if not headlines:
-        await update.message.reply_text(f"No cached news for '{topic.value}'. Fetching fresh articles now...")
+        await query.edit_message_text(text=f"No cached news for '{topic.value}'. Fetching fresh articles now...")
         headlines = await fetch_and_store_news(topic)
 
     if not headlines:
-        await update.message.reply_text(f"Sorry, couldn't fetch any news for '{topic.value}' at the moment.")
+        await query.edit_message_text(text=f"Sorry, couldn't fetch any news for '{topic.value}' at the moment.")
     else:
-        await update.message.reply_text("\n\n".join(headlines))
+        await query.edit_message_text(text="\n\n".join(headlines))
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(init_db).build()
@@ -52,6 +62,7 @@ def main():
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler('help', help))
     app.add_handler(CommandHandler('news', news))
+    app.add_handler(CallbackQueryHandler(button))
 
     print("Bot is running...")
     app.run_polling()
