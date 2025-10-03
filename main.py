@@ -1,7 +1,7 @@
 import os
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from news_fetcher import init_db, fetch_and_store_news, get_cached_news, NewsTopics, subscribe_to_topic
+from news_fetcher import init_db, fetch_and_store_news, get_cached_news, NewsTopics, subscribe_to_topic, fetch_my_subscriptions
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,7 +27,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Start the bot\n"
         "/help - Get help\n"
         "/news - Get your news feed\n"
-        "/subscribe - Subscribe to a news topic"
+        "/subscribe - Subscribe to a news topic\n"
+        "/mynews - To get all the news tailored to your subscriptions\n"
     )
 
 
@@ -45,6 +46,32 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Please choose a topic to subscribe to:', reply_markup=reply_markup)
+
+
+async def my_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    topics = await fetch_my_subscriptions(user_id)
+
+    if not topics:
+        await update.message.reply_text("You are not subscribed to any topics. Use /subscribe to start.")
+        return
+
+    response = []
+    for topic_value in topics:
+        try:
+            topic = NewsTopics(topic_value)
+            headlines = await get_cached_news(topic)
+            if not headlines:
+                headlines = await fetch_and_store_news(topic)
+            if headlines:
+                response.append(f"**{topic.name}**\n" + "\n\n".join(headlines))
+        except ValueError:
+            continue
+
+    if response:
+        await update.message.reply_text("\n\n".join(response))
+    else:
+        await update.message.reply_text("No news available for your subscribed topics.")
 
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -95,6 +122,7 @@ def main():
     app.add_handler(CommandHandler('help', help))
     app.add_handler(CommandHandler('news', news))
     app.add_handler(CommandHandler('subscribe', subscribe))
+    app.add_handler(CommandHandler('mynews', my_news))
     app.add_handler(CallbackQueryHandler(button))
 
     print("Bot is running...")
