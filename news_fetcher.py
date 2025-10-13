@@ -134,3 +134,29 @@ async def subscribe_to_topic(topic: NewsTopics, user_id: int) -> bool:
         LOGGER.error(
             f"Error subscribing user {user_id} to topic '{topic.value}': {e}")
         return False
+
+
+async def fetch_my_subscriptions(user_id: int):
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            cursor = await conn.cursor()
+            await cursor.execute("SELECT topic FROM subscriptions WHERE user_id = ?", (user_id,))
+            return [row[0] for row in await cursor.fetchall()]
+    except aiosqlite.Error as e:
+        LOGGER.error(f"Error fetching subscriptions for user {user_id}: {e}")
+        return []
+
+
+async def unsubscribe_from_topic(user_id: int, topic: str) -> bool:
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            cursor = await conn.execute(
+                "DELETE FROM subscriptions WHERE user_id = ? AND topic = ?",
+                (user_id, topic)
+            )
+            await conn.commit()
+            return cursor.rowcount > 0  # True if something was deleted
+    except aiosqlite.Error as e:
+        LOGGER.error(
+            f"Error unsubscribing user {user_id} from topic '{topic}': {e}")
+        return False

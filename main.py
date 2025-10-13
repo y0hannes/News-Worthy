@@ -1,7 +1,15 @@
 import os
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from news_fetcher import init_db, fetch_and_store_news, get_cached_news, NewsTopics, subscribe_to_topic, fetch_my_subscriptions
+from news_fetcher import (
+    init_db,
+    fetch_and_store_news,
+    get_cached_news,
+    NewsTopics,
+    subscribe_to_topic,
+    fetch_my_subscriptions,
+    unsubscribe_from_topic
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,8 +35,9 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Start the bot\n"
         "/help - Get help\n"
         "/news - Get your news feed\n"
-        "/subscribe - Subscribe to a news topic\n"
         "/mynews - To get all the news tailored to your subscriptions\n"
+        "/subscribe - Subscribe to a news topic\n"
+        "/mysubscriptions - To see all hte topics you subscribed to "
     )
 
 
@@ -46,6 +55,23 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Please choose a topic to subscribe to:', reply_markup=reply_markup)
+
+
+async def my_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    topics = await fetch_my_subscriptions(user_id)
+
+    if not topics:
+        await update.message.reply_text("You are not subscribed to any topics.")
+        return
+
+    keyboard = [
+        [InlineKeyboardButton(
+            f"❌ Unsubscribe from {NewsTopics(topic).name}", callback_data=f"unsubscribe:{topic}")]
+        for topic in topics
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Your current subscriptions:", reply_markup=reply_markup)
 
 
 async def my_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -114,6 +140,16 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(text=f"Failed to subscribe to topic  '{topic.name}'.")
 
+    elif data.startswith("unsubscribe:"):
+        topic_value = data.split(":", 1)[1]
+        user_id = query.from_user.id
+
+        success = await unsubscribe_from_topic(user_id, topic_value)
+        if success:
+            await query.edit_message_text(text=f"You have unsubscribed from {NewsTopics(topic_value).name}.")
+        else:
+            await query.edit_message_text(text="You were not subscribed to this topic or an error occurred.")
+
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(init_db).build()
@@ -123,6 +159,7 @@ def main():
     app.add_handler(CommandHandler('news', news))
     app.add_handler(CommandHandler('subscribe', subscribe))
     app.add_handler(CommandHandler('mynews', my_news))
+    app.add_handler(CommandHandler('mysubscriptions', my_subscriptions))
     app.add_handler(CallbackQueryHandler(button))
 
     print("Bot is running...")
