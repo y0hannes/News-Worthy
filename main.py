@@ -1,14 +1,19 @@
 import os
+import asyncio
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from datetime import datetime
 from news_fetcher import (
     init_db,
+    save_user,
     fetch_and_store_news,
     get_cached_news,
     NewsTopics,
     subscribe_to_topic,
     fetch_my_subscriptions,
-    unsubscribe_from_topic
+    unsubscribe_from_topic,
+    get_all_subscribed_users
 )
 from dotenv import load_dotenv
 
@@ -26,7 +31,12 @@ if not NEWS_API_TOKEN:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"Hello, {update.effective_user.first_name}!")
+    user = update.effective_user
+    user_saved = await save_user(user)
+    if user_saved:
+        await update.message.reply_text(f"Hello, {user.first_name}!")
+    else:
+        await update.message.reply_text(f"Hello, {user.first_name}, There was a problem registering you \n please try again!")
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -150,7 +160,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(text="You were not subscribed to this topic or an error occurred.")
 
-
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(init_db).build()
 
@@ -161,6 +170,11 @@ def main():
     app.add_handler(CommandHandler('mynews', my_news))
     app.add_handler(CommandHandler('mysubscriptions', my_subscriptions))
     app.add_handler(CallbackQueryHandler(button))
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
     print("Bot is running...")
     app.run_polling()
