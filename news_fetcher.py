@@ -52,6 +52,16 @@ async def init_db(application: Application):
                 PRIMARY KEY (user_id, topic)
             )
         ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                delivery_hour INTEGER DEFAULT 9,
+                delivery_minute INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         await conn.commit()
 
 NEWS_API_TOKEN = os.getenv('NEWS_API_TOKEN')
@@ -60,6 +70,21 @@ if not NEWS_API_TOKEN:
     LOGGER.error("API TOKEN not found.")
 
 ENDPOINT = 'https://gnews.io/api/v4/search'
+
+
+async def save_user(user):
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            await conn.execute(
+                "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)",
+                (user.id, user.username)
+            )
+            await conn.commit()
+            return True
+    except aiosqlite.Error as e:
+        LOGGER.error(
+            f"Error adding user with user id {user.id} to users database: {e}")
+        return False
 
 
 async def fetch_and_store_news(topic: NewsTopics, max_articles=10):
@@ -160,3 +185,14 @@ async def unsubscribe_from_topic(user_id: int, topic: str) -> bool:
         LOGGER.error(
             f"Error unsubscribing user {user_id} from topic '{topic}': {e}")
         return False
+
+
+async def get_all_subscribed_users():
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            cursor = await conn.execute("SELECT  user_id FROM users")
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+    except aiosqlite.Error as e:
+        LOGGER.error(f"Error fetching subscribed users: {e}")
+        return []
