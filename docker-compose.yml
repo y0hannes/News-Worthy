@@ -1,0 +1,9 @@
+services:
+  news-worthy:
+    build: .
+    container_name: news-worthy-dev
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
