@@ -3,17 +3,18 @@ import asyncio
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime
 from news_fetcher import (
     init_db,
     save_user,
     fetch_and_store_news,
     get_cached_news,
     NewsTopics,
+    send_scheduled_news,
     subscribe_to_topic,
     fetch_my_subscriptions,
     unsubscribe_from_topic,
-    get_all_subscribed_users
+    set_schedule_delivery_time,
+    get_scheduled_time,
 )
 from dotenv import load_dotenv
 
@@ -47,7 +48,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/news - Get your news feed\n"
         "/mynews - To get all the news tailored to your subscriptions\n"
         "/subscribe - Subscribe to a news topic\n"
-        "/mysubscriptions - To see all hte topics you subscribed to "
+        "/mysubscriptions - To see all hte topics you subscribed to \n"
+        "/set_delivery_time <HH:MM> - Set your daily news delivery time (24h format)"
     )
 
 
@@ -160,15 +162,62 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(text="You were not subscribed to this topic or an error occurred.")
 
+
+async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not context.args:
+        await update.message.reply_text("Please provide a time in HH:MM format. Example: /set_delivery_time 09:30")
+        return
+
+    time_str = context.args[0]
+    try:
+        hour, minute = map(int, time_str.split(':'))
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("Invalid time format. Please use HH:MM (24-hour format). Example: 09:30")
+        return
+
+    success = await set_schedule_delivery_time(user_id, hour, minute)
+    if success:
+        await update.message.reply_text(f"Your daily news delivery time has been set to {hour:02d}:{minute:02d}.")
+    else:
+        await update.message.reply_text("Failed to set delivery time. Please try again later.")
+
+
+async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    result = await get_scheduled_time(user_id)
+
+    if not result:
+        await update.message.reply_text("Failed to get scheduled delivery time")
+        return
+
+    hour, minute = result
+    await update.message.reply_text(f"Your scheduled delivery time is at {hour}:{minute}. \nuse /set_delivery_time to change it")
+    return
+
+
+async def post_init(app):
+    await init_db(app)
+
+    # Scheduler runs every minute
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(send_scheduled_news, "cron", minute="*", args=[app])
+    scheduler.start()
+
+
 def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(init_db).build()
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler('help', help))
     app.add_handler(CommandHandler('news', news))
     app.add_handler(CommandHandler('subscribe', subscribe))
     app.add_handler(CommandHandler('mynews', my_news))
+    app.add_handler(CommandHandler('get_delivery_time', get_delivery_time))
     app.add_handler(CommandHandler('mysubscriptions', my_subscriptions))
+    app.add_handler(CommandHandler('set_delivery_time', set_delivery_time))
     app.add_handler(CallbackQueryHandler(button))
 
     try:
