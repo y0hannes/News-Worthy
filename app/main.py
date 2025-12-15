@@ -14,6 +14,7 @@ from news_fetcher import (
     fetch_my_subscriptions,
     unsubscribe_from_topic,
     set_schedule_delivery_time,
+    get_scheduled_time,
 )
 from dotenv import load_dotenv
 
@@ -183,12 +184,26 @@ async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Failed to set delivery time. Please try again later.")
 
+
+async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    result = await get_scheduled_time(user_id)
+
+    if not result:
+        await update.message.reply_text("Failed to get scheduled delivery time")
+        return
+
+    hour, minute = result
+    await update.message.reply_text(f"Your scheduled delivery time is at {hour}:{minute}. \nuse /set_delivery_time to change it")
+    return
+
+
 async def post_init(app):
     await init_db(app)
-    
+
     # Scheduler runs every minute
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(lambda: asyncio.create_task(send_scheduled_news(app)), "cron", minute="*")
+    scheduler.add_job(send_scheduled_news, "cron", minute="*", args=[app])
     scheduler.start()
 
 
@@ -200,6 +215,7 @@ def main():
     app.add_handler(CommandHandler('news', news))
     app.add_handler(CommandHandler('subscribe', subscribe))
     app.add_handler(CommandHandler('mynews', my_news))
+    app.add_handler(CommandHandler('get_delivery_time', get_delivery_time))
     app.add_handler(CommandHandler('mysubscriptions', my_subscriptions))
     app.add_handler(CommandHandler('set_delivery_time', set_delivery_time))
     app.add_handler(CallbackQueryHandler(button))

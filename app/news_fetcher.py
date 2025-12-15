@@ -257,3 +257,20 @@ async def set_schedule_delivery_time(user_id: int, hour: int, minute: int) -> bo
         LOGGER.error(
             f"Error updating delivery time for user {user_id}: {e}")
         return False
+
+
+async def get_scheduled_time(user_id: int):
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            cursor = await conn.execute(
+                'SELECT delivery_hour, delivery_minute FROM users WHERE user_id = ?',
+                (user_id,),
+            )
+
+            result = await cursor.fetchone()
+            return result
+    except aiosqlite.Error as e:
+        LOGGER.error(
+            f"Error getting delivery time for user {user_id} : {e}"
+        )
+        return False
