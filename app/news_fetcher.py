@@ -196,3 +196,64 @@ async def get_all_subscribed_users():
     except aiosqlite.Error as e:
         LOGGER.error(f"Error fetching subscribed users: {e}")
         return []
+
+
+async def get_users_by_delivery_time(hour: int, minute: int) -> list[int]:
+    """Return list of user IDs whose delivery time matches the given hour and minute."""
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            cursor = await conn.execute(
+                "SELECT user_id FROM users WHERE delivery_hour = ? AND delivery_minute = ?",
+                (hour, minute),
+            )
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+    except aiosqlite.Error as e:
+        LOGGER.error(
+            f"Error fetching users for delivery time {hour}:{minute}: {e}")
+        return []
+
+
+async def send_scheduled_news(app):
+    """Send news to users whose delivery time matches the current hour/minute."""
+    now = datetime.now()
+    hour, minute = now.hour, now.minute
+    user_ids = await get_users_by_delivery_time(hour, minute)
+    for user_id in user_ids:
+        topics = await fetch_my_subscriptions(user_id)
+        if not topics:
+            continue
+        response = []
+        for topic_value in topics:
+            try:
+                topic = NewsTopics(topic_value)
+                headlines = await get_cached_news(topic)
+                if not headlines:
+                    headlines = await fetch_and_store_news(topic)
+                if headlines:
+                    response.append(
+                        f"**{topic.name}**\n" + "\n\n".join(headlines))
+            except ValueError:
+                continue
+        if response:
+            text = "\n\n".join(response)
+            try:
+                await app.bot.send_message(chat_id=user_id, text=text)
+            except Exception as e:
+                LOGGER.error(
+                    f"Failed to send scheduled news to user {user_id}: {e}")
+
+
+async def set_schedule_delivery_time(user_id: int, hour: int, minute: int) -> bool:
+    try:
+        async with aiosqlite.connect("news.db") as conn:
+            cursor = await conn.execute(
+                "UPDATE users SET delivery_hour = ?, delivery_minute = ? WHERE user_id = ?",
+                (hour, minute, user_id),
+            )
+            await conn.commit()
+            return cursor.rowcount > 0
+    except aiosqlite.Error as e:
+        LOGGER.error(
+            f"Error updating delivery time for user {user_id}: {e}")
+        return False
