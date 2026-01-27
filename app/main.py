@@ -31,7 +31,7 @@ if not NEWS_API_TOKEN:
 # commands
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     user_saved = await save_user(user)
     if user_saved:
@@ -40,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Hello, {user.first_name}, There was a problem registering you \n please try again!")
 
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Here are the commands supported by our bot:\n"
         "/start - Start the bot\n"
@@ -48,12 +48,12 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/news - Get your news feed\n"
         "/mynews - To get all the news tailored to your subscriptions\n"
         "/subscribe - Subscribe to a news topic\n"
-        "/mysubscriptions - To see all hte topics you subscribed to \n"
+        "/mysubscriptions - To see all the topics you subscribed to \n"
         "/set_delivery_time <HH:MM> - Set your daily news delivery time (24h format)"
     )
 
 
-async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def news(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [InlineKeyboardButton(topic.name, callback_data=f"news:{topic.value}")] for topic in NewsTopics
     ]
@@ -61,7 +61,7 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Please choose a topic:', reply_markup=reply_markup)
 
 
-async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [InlineKeyboardButton(topic.name, callback_data=f"subscribe:{topic.value}")] for topic in NewsTopics
     ]
@@ -69,7 +69,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Please choose a topic to subscribe to:', reply_markup=reply_markup)
 
 
-async def my_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def my_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     topics = await fetch_my_subscriptions(user_id)
 
@@ -86,7 +86,7 @@ async def my_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Your current subscriptions:", reply_markup=reply_markup)
 
 
-async def my_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def my_news(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     topics = await fetch_my_subscriptions(user_id)
 
@@ -112,7 +112,7 @@ async def my_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No news available for your subscribed topics.")
 
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
 
@@ -163,7 +163,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text="You were not subscribed to this topic or an error occurred.")
 
 
-async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     if not context.args:
         await update.message.reply_text("Please provide a time in HH:MM format. Example: /set_delivery_time 09:30")
@@ -185,7 +185,7 @@ async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Failed to set delivery time. Please try again later.")
 
 
-async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     result = await get_scheduled_time(user_id)
 
@@ -198,7 +198,7 @@ async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
 
 
-async def post_init(app):
+async def post_init(app) -> None:
     await init_db(app)
 
     # Scheduler runs every minute

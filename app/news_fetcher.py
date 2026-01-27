@@ -72,7 +72,7 @@ if not NEWS_API_TOKEN:
 ENDPOINT = 'https://gnews.io/api/v4/search'
 
 
-async def save_user(user):
+async def save_user(user) -> bool:
     try:
         async with aiosqlite.connect("news.db") as conn:
             await conn.execute(
@@ -87,7 +87,7 @@ async def save_user(user):
         return False
 
 
-async def fetch_and_store_news(topic: NewsTopics, max_articles=10):
+async def fetch_and_store_news(topic: NewsTopics, max_articles: int = 10) -> list[str]:
     params = {
         'q': topic.value,
         'lang': 'en',
@@ -131,13 +131,11 @@ async def fetch_and_store_news(topic: NewsTopics, max_articles=10):
     return headlines_to_return
 
 
-async def get_cached_news(topic: NewsTopics, limit=5):
+async def get_cached_news(topic: NewsTopics, limit: int = 5) -> list[str]:
     async with aiosqlite.connect("news.db") as conn:
         cursor = await conn.cursor()
 
         cutoff_time = datetime.now() - CACHE_DURATION
-        # cursor.execute("DELETE FROM news WHERE fetched_at < ?", (cutoff_time.isoformat(),))
-
         await cursor.execute('''
             SELECT title, url FROM news
             WHERE topic =? 
@@ -161,7 +159,7 @@ async def subscribe_to_topic(topic: NewsTopics, user_id: int) -> bool:
         return False
 
 
-async def fetch_my_subscriptions(user_id: int):
+async def fetch_my_subscriptions(user_id: int) -> list[str]:
     try:
         async with aiosqlite.connect("news.db") as conn:
             cursor = await conn.cursor()
@@ -187,7 +185,7 @@ async def unsubscribe_from_topic(user_id: int, topic: str) -> bool:
         return False
 
 
-async def get_all_subscribed_users():
+async def get_all_subscribed_users() -> list[int]:
     try:
         async with aiosqlite.connect("news.db") as conn:
             cursor = await conn.execute("SELECT  user_id FROM users")
@@ -259,7 +257,7 @@ async def set_schedule_delivery_time(user_id: int, hour: int, minute: int) -> bo
         return False
 
 
-async def get_scheduled_time(user_id: int):
+async def get_scheduled_time(user_id: int) -> tuple[int, int] | None:
     try:
         async with aiosqlite.connect("news.db") as conn:
             cursor = await conn.execute(
