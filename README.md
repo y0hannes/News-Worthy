@@ -1,101 +1,109 @@
-# 📰 News-Worthy: Your Personalized News Bot
+# 📰 News-Worthy Bot
 
-**News-Worthy** is a powerful Telegram bot designed to keep you informed with fresh news tailored to your interests. It fetches headlines from global sources and delivers them straight to your chat, either on-demand or through a highly customizable daily schedule.
+A powerful, asynchronous Telegram bot that delivers personalized news updates directly to your chat. Built with Python, modern async libraries, and Docker.
 
----
+> **Status**: 🟢 Active Development  
+> **Version**: 1.0.0
 
-## ✨ Key Features
+## ✨ Features
 
-- **Topic-Based Subscriptions**: Choose from a variety of topics like Technology, Business, Science, Health, and more.
-- **Daily Scheduled Delivery**: Get your morning (or evening!) news at the exact time you want.
-- **Smart Caching**: Efficient news retrieval with a 1-hour cache to save API usage and ensure speed.
-- **Interactive UI**: Navigate through topics and manage subscriptions using intuitive inline keyboards.
-- **Docker Ready**: Easy deployment using Docker and Docker Compose.
+- **🔍 Topic Subscription**: Subscribe to specific news categories (Tech, Business, Science, etc.)
+- **⏱️ Scheduled Delivery**: Set your preferred time for daily news digests
+- **⚡ Real-time Updates**: Fetch the latest headlines on command
+- **📱 Responsive UI**: Interactive buttons for easy navigation
+- **🐳 Dockerized**: Easy deployment with Docker and Docker Compose
+- **🚀 Async Performance**: Built on `aiohttp` and `python-telegram-bot` for high concurrency
 
----
-
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
 
 - **Language**: Python 3.13
-- **Bot Framework**: [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
-- **News API**: [GNews API](https://gnews.io/)
-- **Database**: SQLite (via `aiosqlite`)
-- **Scheduling**: [APScheduler](https://apscheduler.readthedocs.io/)
-- **Asynchronous IO**: `asyncio`, `aiohttp`
-
----
+- **Framework**: [python-telegram-bot](https://python-telegram-bot.org/)
+- **Database**: SQLite (Async via `aiosqlite`)
+- **Scheduling**: APScheduler
+- **External API**: GNews API
+- **Containerization**: Docker
 
 ## 🚀 Getting Started
 
-### 📋 Prerequisites
+### Prerequisites
 
-- Python 3.10+ (if running locally)
-- [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/) (recommended)
-- A Telegram Bot Token (from [@BotFather](https://t.me/botfather))
-- A GNews API Token (from [gnews.io](https://gnews.io/))
+- Docker & Docker Compose
+- A Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
+- A GNews API Key (from [gnews.io](https://gnews.io/))
 
-### ⚙️ Environment Configuration
+### 🔧 Installation
 
-Create a `.env` file in the root directory and add your credentials:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/y0hannes/News-Worthy.git
+   cd News-Worthy
+   ```
 
-```env
-TELEGRAM_TOKEN=your_telegram_bot_token_here
-NEWS_API_TOKEN=your_gnews_api_token_here
-```
+2. **Configure Environment**
+   Create a `.env` file based on the example:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and add your API keys:
+   ```env
+   TELEGRAM_TOKEN=your_telegram_token_here
+   NEWS_API_TOKEN=your_gnews_api_key_here
+   ```
 
-### 🐳 Run with Docker (Recommended)
+3. **Run with Docker**
+   ```bash
+   docker-compose up -d --build
+   ```
 
-The easiest way to get the bot running is using Docker Compose:
+### 📦 Local Development
 
-```bash
-docker-compose up -d --build
-```
+If you prefer running without Docker:
 
-### 🐍 Run Locally
+1. **Create Virtual Environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-1. **Install Dependencies**:
+2. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Run the Bot**:
+3. **Run the Bot**
    ```bash
    python app/main.py
    ```
 
----
+## 📖 Usage
 
-## 🤖 Bot Commands
+Start a chat with your bot and use these commands:
 
 | Command | Description |
-| :--- | :--- |
-| `/start` | Initial registration and welcome message. |
-| `/help` | List all available commands. |
-| `/news` | View latest headlines for a specific topic. |
-| `/subscribe` | Subscribe to a news topic for daily delivery. |
-| `/mynews` | Get a customized feed based on your subscriptions. |
-| `/mysubscriptions` | View and manage your current subscriptions. |
-| `/set_delivery_time` | Set your daily delivery time (Format: `HH:MM`). |
-| `/get_delivery_time` | Check your current scheduled delivery time. |
+|---------|-------------|
+| `/start` | Initialize the bot and register your user |
+| `/subscribe` | Choose topics to follow |
+| `/mysubscriptions` | View and manage your active subscriptions |
+| `/news` | Get latest headlines for a specific topic instantly |
+| `/mynews` | Get a personalized digest of all your topics |
+| `/set_delivery_time` | Set daily delivery time (e.g., `/set_delivery_time 08:30`) |
+| `/get_delivery_time` | Check your current schedule settings |
+| `/help` | Show all available commands |
+
+## 🏗️ Architecture
+
+The project follows a modular asynchronous architecture:
+- **`main.py`**: Handles Telegram updates and command routing
+- **`news_fetcher.py`**: Manages business logic, database operations, and API interactions
+- **Database**: Stores users, subscriptions, and caches news articles to minimize API usage
+
+## 🤝 Contributing
+
+Contributions are welcome! Please check out our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
-## 📁 Project Structure
-
-```text
-News-Worthy/
-├── app/
-│   ├── main.py          # Bot entry point and command handlers
-│   ├── news_fetcher.py   # API integration, database logic, and scheduler
-│   └── news.db          # SQLite database (generated at runtime)
-├── Dockerfile           # Container definition
-├── docker-compose.yml   # Multi-container setup
-├── requirements.txt     # Python dependencies
-└── .env                 # Environment variables (ignored by git)
-```
-
----
-
-## 📝 License
-
-This project is open-source and available under the MIT License.
+*Built with ❤️ by [Yohannes]*
