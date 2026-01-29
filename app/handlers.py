@@ -115,7 +115,7 @@ async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid time format. Use HH:MM (24h).")
         return
-    success = await set_schedule_delivery_time(user_id, hour, minute)
+    success = await set_schedule_delivery_time(user_id, hour - 3, minute)
     if success:
         await update.message.reply_text(
             f"Daily news delivery time set to {hour:02d}:{minute:02d}."
@@ -131,7 +131,7 @@ async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Failed to get scheduled delivery time.")
         return
     hour, minute = result
-    await update.message.reply_text(f"Your delivery time is {hour:02d}:{minute:02d}.")
+    await update.message.reply_text(f"Your delivery time is {hour + 3:02d}:{minute:02d}.")
 
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):

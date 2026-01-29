@@ -15,8 +15,18 @@ from handlers import (
 from news.db import init_db
 from news.scheduler import setup_scheduler
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+
+logging.getLogger("telegram").setLevel(logging.INFO)
+logging.getLogger("apscheduler").setLevel(logging.INFO)
+
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
