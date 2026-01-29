@@ -178,7 +178,7 @@ async def set_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await update.message.reply_text("Invalid time format. Please use HH:MM (24-hour format). Example: 09:30")
         return
 
-    success = await set_schedule_delivery_time(user_id, hour, minute)
+    success = await set_schedule_delivery_time(user_id, hour - 3, minute)
     if success:
         await update.message.reply_text(f"Your daily news delivery time has been set to {hour:02d}:{minute:02d}.")
     else:
@@ -194,7 +194,7 @@ async def get_delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     hour, minute = result
-    await update.message.reply_text(f"Your scheduled delivery time is at {hour}:{minute}. \nuse /set_delivery_time to change it")
+    await update.message.reply_text(f"Your scheduled delivery time is at {hour + 3}:{minute}. \nuse /set_delivery_time to change it")
     return
 
 
