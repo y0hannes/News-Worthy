@@ -17,5 +17,8 @@ COPY app/ ./
 # Switch to non‑root user
 USER appuser
 
+# Expose the port (Render will use the PORT environment variable)
+EXPOSE 8080
+
 # Command that runs when the container starts
 CMD ["python", "main.py"]

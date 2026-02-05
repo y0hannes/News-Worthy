@@ -1,5 +1,6 @@
 import os
 import asyncio
+from aiohttp import web
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 from handlers import (
     start,
@@ -38,8 +39,37 @@ async def post_init(app):
     await setup_scheduler(app)
 
 
+async def handle_ping(request):
+    return web.Response(text="pong")
+
+
+async def keep_alive(url):
+    """Periodically pings the given URL to keep the service alive."""
+    if not url:
+        logging.info("No RENDER_EXTERNAL_URL found, keep_alive task disabled.")
+        return
+
+    logging.info(f"Starting keep_alive task for {url}")
+    import aiohttp
+
+    async with aiohttp.ClientSession() as session:
+        while True:
+            try:
+                # Wait 14 minutes (Render timeout is 15min)
+                await asyncio.sleep(14 * 60)
+                async with session.get(f"{url}/ping") as response:
+                    logging.info(f"Self-ping status: {response.status}")
+            except Exception as e:
+                logging.error(f"Error in keep_alive: {e}")
+
+
 def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
+    token = os.getenv("TELEGRAM_TOKEN")
+    if not token:
+        raise ValueError("No TELEGRAM_TOKEN found in environment variables")
+
+    # Build the Telegram application
+    app = ApplicationBuilder().token(token).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -52,13 +82,39 @@ def main():
 
     app.add_handler(CallbackQueryHandler(button))
 
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+    # Set up the web server for Render
+    web_app = web.Application()
+    web_app.router.add_get("/ping", handle_ping)
 
-    print("Bot is running...")
-    app.run_polling()
+    port = int(os.getenv("PORT", 8080))
+    external_url = os.getenv("RENDER_EXTERNAL_URL")
+
+    async def start_services():
+        # Start the Telegram bot in polling mode
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+
+        # Start the keep_alive pinger
+        asyncio.create_task(keep_alive(external_url))
+
+        # Start the web server
+        runner = web.AppRunner(web_app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        print(f"Web server started on port {port}")
+        await site.start()
+
+        # Keep the loop running
+        try:
+            while True:
+                await asyncio.sleep(3600)
+        finally:
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+
+    asyncio.run(start_services())
 
 
 if __name__ == "__main__":
