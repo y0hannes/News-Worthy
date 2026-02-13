@@ -1,9 +1,20 @@
-import aiosqlite
 import logging
+import os
 from enum import Enum
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
-DB_PATH = "news.db"
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    LOGGER.warning("SUPABASE_URL or SUPABASE_KEY not found in environment variables.")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 
 class NewsTopics(Enum):
@@ -19,100 +30,84 @@ class NewsTopics(Enum):
 
 
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as conn:
-        await conn.executescript("""
-            CREATE TABLE IF NOT EXISTS news (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT,
-                content TEXT,
-                url TEXT,
-                published_at TEXT,
-                topic TEXT,
-                fetched_at TEXT
-            );
-            CREATE TABLE IF NOT EXISTS subscriptions (
-                user_id INTEGER,
-                topic TEXT,
-                PRIMARY KEY (user_id, topic)
-            );
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                delivery_hour INTEGER DEFAULT 9,
-                delivery_minute INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        await conn.commit()
+    """
+    Supabase schema is managed via the Supabase dashboard.
+    This function remains for compatibility but doesn't perform SQL execution.
+    """
+    if not supabase:
+        LOGGER.error("Supabase client not initialized.")
+        return
+    LOGGER.info("Supabase client initialized.")
 
 
 async def save_user(user) -> bool:
     try:
-        async with aiosqlite.connect(DB_PATH) as conn:
-            await conn.execute(
-                "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)",
-                (user.id, user.username),
-            )
-            await conn.commit()
-            return True
+        data = {
+            "user_id": user.id,
+            "username": user.username,
+        }
+        # upsert with ignore-like behavior (Supabase upsert by default updates but we can use it to ensure user exists)
+        supabase.table("users").upsert(data, on_conflict="user_id").execute()
+        return True
     except Exception as e:
         LOGGER.error(f"Error saving user {user.id}: {e}")
         return False
 
 
 async def fetch_my_subscriptions(user_id: int) -> list[str]:
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "SELECT topic FROM subscriptions WHERE user_id = ?", (user_id,)
-        )
-        rows = await cursor.fetchall()
-        return [row[0] for row in rows]
+    try:
+        response = supabase.table("subscriptions").select("topic").eq("user_id", user_id).execute()
+        return [row["topic"] for row in response.data]
+    except Exception as e:
+        LOGGER.error(f"Error fetching subscriptions for {user_id}: {e}")
+        return []
 
 
 async def subscribe_to_topic(topic: NewsTopics, user_id: int) -> bool:
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "INSERT OR IGNORE INTO subscriptions (user_id, topic) VALUES (?, ?)",
-            (user_id, topic.value),
-        )
-        await conn.commit()
-        return cursor.rowcount > 0
+    try:
+        data = {"user_id": user_id, "topic": topic.value}
+        supabase.table("subscriptions").upsert(data, on_conflict="user_id,topic").execute()
+        return True
+    except Exception as e:
+        LOGGER.error(f"Error subscribing to topic {topic.value} for {user_id}: {e}")
+        return False
 
 
 async def unsubscribe_from_topic(user_id: int, topic: str) -> bool:
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "DELETE FROM subscriptions WHERE user_id = ? AND topic = ?",
-            (user_id, topic),
-        )
-        await conn.commit()
-        return cursor.rowcount > 0
+    try:
+        supabase.table("subscriptions").delete().eq("user_id", user_id).eq("topic", topic).execute()
+        return True
+    except Exception as e:
+        LOGGER.error(f"Error unsubscribing from topic {topic} for {user_id}: {e}")
+        return False
 
 
 async def set_schedule_delivery_time(user_id: int, hour: int, minute: int) -> bool:
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "UPDATE users SET delivery_hour = ?, delivery_minute = ? WHERE user_id = ?",
-            (hour, minute, user_id),
-        )
-        await conn.commit()
-        return cursor.rowcount > 0
+    try:
+        data = {"delivery_hour": hour, "delivery_minute": minute}
+        supabase.table("users").update(data).eq("user_id", user_id).execute()
+        return True
+    except Exception as e:
+        LOGGER.error(f"Error setting schedule for {user_id}: {e}")
+        return False
 
 
 async def get_scheduled_time(user_id: int):
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "SELECT delivery_hour, delivery_minute FROM users WHERE user_id = ?",
-            (user_id,),
-        )
-        return await cursor.fetchone()
+    try:
+        response = supabase.table("users").select("delivery_hour, delivery_minute").eq("user_id", user_id).execute()
+        if response.data:
+            row = response.data[0]
+            return (row["delivery_hour"], row["delivery_minute"])
+        return None
+    except Exception as e:
+        LOGGER.error(f"Error getting scheduled time for {user_id}: {e}")
+        return None
 
 
 async def get_users_by_delivery_time(hour: int, minute: int) -> list[int]:
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "SELECT user_id FROM users WHERE delivery_hour = ? AND delivery_minute = ?",
-            (hour, minute),
-        )
-        rows = await cursor.fetchall()
-        return [row[0] for row in rows]
+    try:
+        response = supabase.table("users").select("user_id").eq("delivery_hour", hour).eq("delivery_minute", minute).execute()
+        return [row["user_id"] for row in response.data]
+    except Exception as e:
+        LOGGER.error(f"Error fetching users by delivery time: {e}")
+        return []
