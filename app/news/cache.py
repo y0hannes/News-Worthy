@@ -1,37 +1,69 @@
 from datetime import datetime, timedelta
-import aiosqlite
-from .db import NewsTopics, DB_PATH
+import logging
+from .db import NewsTopics, supabase
 from .api import fetch_news
 
+LOGGER = logging.getLogger(__name__)
 CACHE_DURATION = timedelta(hours=1)
 
 
 async def store_news(topic: NewsTopics, articles: list[dict]):
-    async with aiosqlite.connect(DB_PATH) as conn:
+    if not supabase:
+        LOGGER.error("Supabase client not initialized.")
+        return
+    try:
         fetched_at = datetime.now().isoformat()
+        rows = []
         for article in articles:
-            await conn.execute(
-                "INSERT INTO news (title, content, url, published_at, topic, fetched_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    article.get("title"),
-                    article.get("content"),
-                    article.get("url"),
-                    article.get("publishedAt"),
-                    topic.value,
-                    fetched_at,
-                ),
-            )
-        await conn.commit()
+            rows.append({
+                "title": article.get("title"),
+                "content": article.get("content"),
+                "url": article.get("url"),
+                "published_at": article.get("publishedAt"),
+                "topic": topic.value,
+                "fetched_at": fetched_at,
+            })
+        if rows:
+            supabase.table("news").insert(rows).execute()
+    except Exception as e:
+        LOGGER.error(f"Error storing news: {e}")
 
 
-async def get_cached_news(topic: NewsTopics, limit=5) -> list[str]:
-    async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(
-            "SELECT title, url FROM news WHERE topic=? ORDER BY published_at DESC LIMIT ?",
-            (topic.value, limit),
+async def get_cached_news(topic: NewsTopics, limit=10) -> list[str]:
+    if not supabase:
+        LOGGER.error("Supabase client not initialized.")
+        return []
+    try:
+        response = supabase.table("news") \
+            .select("title, url") \
+            .eq("topic", topic.value) \
+            .order("published_at", desc=True) \
+            .limit(limit) \
+            .execute()
+        return [f"• {row['title']}\n{row['url']}" for row in response.data]
+    except Exception as e:
+        LOGGER.error(f"Error getting cached news: {e}")
+        return []
+
+
+async def get_last_fetch_time(topic: NewsTopics) -> datetime | None:
+    if not supabase:
+        return None
+    try:
+        response = (
+            supabase.table("news")
+            .select("fetched_at")
+            .eq("topic", topic.value)
+            .order("fetched_at", desc=True)
+            .limit(1)
+            .execute()
         )
-        rows = await cursor.fetchall()
-        return [f"• {title}\n{url}" for title, url in rows]
+        if response.data:
+            return datetime.fromisoformat(response.data[0]["fetched_at"])
+        return None
+    except Exception as e:
+        LOGGER.error(f"Error getting last fetch time for {topic.value}: {e}")
+        return None
 
 
 async def fetch_and_store_news(topic: NewsTopics) -> list[str]:
