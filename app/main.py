@@ -11,6 +11,7 @@ from handlers import (
     my_subscriptions,
     set_delivery_time,
     get_delivery_time,
+    settings_menu,
     button,
 )
 from news.db import init_db
@@ -79,6 +80,7 @@ def main():
     app.add_handler(CommandHandler("mysubscriptions", my_subscriptions))
     app.add_handler(CommandHandler("set_delivery_time", set_delivery_time))
     app.add_handler(CommandHandler("get_delivery_time", get_delivery_time))
+    app.add_handler(CommandHandler("settings", settings_menu))
 
     app.add_handler(CallbackQueryHandler(button))
 
